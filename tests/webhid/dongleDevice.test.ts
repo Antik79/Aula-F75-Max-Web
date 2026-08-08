@@ -44,6 +44,25 @@ describe('DongleAulaDevice.applyPerformance', () => {
     // Sending 0 here is the experiment to confirm/rule that out.
     expect(port.sentReports[0].data[8]).toBe(0)
   })
+
+  it('zeroes bytes 4-7 as a second experiment, with a correctly recomputed checksum', async () => {
+    // fnSwitch=0 alone didn't stop the Windows-key-lock side effect on real
+    // hardware. Bytes 4-7 are the only other flag-shaped bytes hardcoded to
+    // 1 in every performance-family packet, enable or disable — testing
+    // whether zeroing them does. The checksum MUST be recomputed after
+    // changing them or the device would likely reject the whole packet.
+    const port = new FakeHidPort()
+    const device = new DongleAulaDevice(port)
+
+    await device.applyPerformance({ level: 1, sleepTime: 3 })
+
+    const bytes = port.sentReports[0].data
+    expect([...bytes.slice(4, 8)]).toEqual([0, 0, 0, 0])
+    // Sum of all other non-zero bytes: opcode(7) + subcommand(0x10=16) +
+    // sleepTime(3) + responseLevel(1) + footer(0xaa=170, 0x55=85) = 282,
+    // mod 256 = 26.
+    expect(bytes[31]).toBe(26)
+  })
 })
 
 describe('DongleAulaDevice.setGameMode', () => {

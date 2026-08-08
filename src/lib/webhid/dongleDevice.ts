@@ -1,4 +1,4 @@
-import { batteryQuery, gameModeReport, keyResponseReport, rgbCommitReport, rgbLEDReport } from '@/lib/protocol'
+import { applyChecksum, batteryQuery, gameModeReport, keyResponseReport, rgbCommitReport, rgbLEDReport } from '@/lib/protocol'
 import type { ApplyPerformanceOptions, ApplyRgbOptions, AulaDongleDevice, SetGameModeOptions } from '@/lib/device/types'
 import { sendOutputReport, waitForInputReport, type HidPort } from './hidPort'
 import { clamp } from './normalize'
@@ -44,19 +44,24 @@ export class DongleAulaDevice implements AulaDongleDevice {
   }
 
   async applyPerformance(options: ApplyPerformanceOptions): Promise<void> {
-    await sendOutputReport(
-      this.port,
-      keyResponseReport({
-        responseLevel: clamp(options.level, 1, 5),
-        // fnSwitch is hardcoded to 1 in the native driver for every
-        // performance update, enable or disable. Confirmed on real hardware
-        // that a plain response-rate change alone was enough to trigger the
-        // Windows-key-block behavior — this is the one suspect flag shared
-        // between a plain performance packet and a Game Mode packet.
-        fnSwitch: 0,
-        sleepTime: clamp(options.sleepTime, 0, 3),
-      }),
-    )
+    const report = keyResponseReport({
+      responseLevel: clamp(options.level, 1, 5),
+      // fnSwitch=0 was the first experiment (confirmed on hardware to NOT
+      // stop the Windows-key-lock side effect — kept at 0 since it's inert).
+      fnSwitch: 0,
+      sleepTime: clamp(options.sleepTime, 0, 3),
+    })
+    // Second experiment: bytes 4-7 are hardcoded to 1 in the native driver
+    // for every performance-family packet, enable or disable, with no
+    // documented meaning. Zeroing them here to test whether they're what's
+    // triggering the Windows-key-lock on a plain performance update. The
+    // checksum must be recomputed after mutating them.
+    report[4] = 0
+    report[5] = 0
+    report[6] = 0
+    report[7] = 0
+    applyChecksum(report, 31)
+    await sendOutputReport(this.port, report)
   }
 
   async setGameMode(options: SetGameModeOptions): Promise<void> {
