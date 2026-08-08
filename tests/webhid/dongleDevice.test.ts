@@ -38,6 +38,11 @@ describe('DongleAulaDevice.applyPerformance', () => {
     expect(port.sentReports[0].data[0]).toBe(0x07)
     expect(port.sentReports[0].data[11]).toBe(1) // responseLevel clamped to min 1
     expect(port.sentReports[0].data[9]).toBe(3) // sleepTime clamped to max 3
+    // fnSwitch=1 on a plain performance update is suspected of triggering
+    // Game Mode-like behavior on the device (confirmed on real hardware:
+    // response-rate changes alone light up the Windows-key-block LED).
+    // Sending 0 here is the experiment to confirm/rule that out.
+    expect(port.sentReports[0].data[8]).toBe(0)
   })
 })
 

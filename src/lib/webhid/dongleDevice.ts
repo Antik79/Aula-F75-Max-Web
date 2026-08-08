@@ -48,7 +48,12 @@ export class DongleAulaDevice implements AulaDongleDevice {
       this.port,
       keyResponseReport({
         responseLevel: clamp(options.level, 1, 5),
-        fnSwitch: 1,
+        // fnSwitch is hardcoded to 1 in the native driver for every
+        // performance update, enable or disable. Confirmed on real hardware
+        // that a plain response-rate change alone was enough to trigger the
+        // Windows-key-block behavior — this is the one suspect flag shared
+        // between a plain performance packet and a Game Mode packet.
+        fnSwitch: 0,
         sleepTime: clamp(options.sleepTime, 0, 3),
       }),
     )
