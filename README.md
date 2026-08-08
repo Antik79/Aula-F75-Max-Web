@@ -4,6 +4,10 @@ A browser-based configurator for the EpoMaker x Aula F75 Max keyboard — RGB li
 
 Ported from the native [Aula F75 Max Driver](https://github.com/VitalyArt/Aula-F75-Max-Driver) project (macOS/Linux/Android).
 
+## Github Pages
+
+If you just want to configure your keyboard, simply head over to https://antik79.github.io/Aula-F75-Max-Web.  Linux users must install udev rules or it will not work. Check below for more information.
+
 ## Requirements
 
 - A Chromium-based browser: Chrome, Edge, Opera, or Brave on desktop. WebHID isn't available in Firefox or Safari yet.
