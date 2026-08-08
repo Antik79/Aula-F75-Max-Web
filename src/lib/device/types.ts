@@ -10,12 +10,9 @@ export interface ApplyRgbOptions {
 export interface ApplyPerformanceOptions {
   level: number
   sleepTime: number
-}
-
-export interface SetGameModeOptions {
-  enabled: boolean
-  level: number
-  sleepTime: number
+  disableWin: boolean
+  disableAltF4: boolean
+  disableAltTab: boolean
 }
 
 export interface DisplayUploadProgress {
@@ -23,11 +20,10 @@ export interface DisplayUploadProgress {
   totalChunks: number
 }
 
-/** Talks to the 2.4G receiver: RGB, performance, game mode, battery. */
+/** Talks to the 2.4G receiver: RGB, performance, key restrictions, battery. */
 export interface AulaDongleDevice {
   applyRGB(options: ApplyRgbOptions): Promise<void>
   applyPerformance(options: ApplyPerformanceOptions): Promise<void>
-  setGameMode(options: SetGameModeOptions): Promise<void>
   queryBattery(): Promise<number | null>
 }
 

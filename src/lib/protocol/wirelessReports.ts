@@ -40,44 +40,35 @@ export function rgbLEDReport(options: RgbLedOptions): Uint8Array {
 
 export interface KeyResponseOptions {
   responseLevel: number
-  fnSwitch: number
   sleepTime: number
+  disableWin: number
+  disableAltF4: number
+  disableAltTab: number
 }
 
 export function keyResponseReport(options: KeyResponseOptions): Uint8Array {
-  const { responseLevel, fnSwitch, sleepTime } = options
+  const { responseLevel, sleepTime, disableWin, disableAltF4, disableAltTab } = options
   const report = new Uint8Array(32)
   report[0] = 0x07
   report[1] = 0x10
   report[2] = 0x00
   report[3] = 0x00
-  report[4] = 0x01
-  report[5] = 0x01
-  report[6] = 0x01
-  report[7] = 0x01
-  report[8] = fnSwitch
+  // Bytes 4-7 stay zero. The reference implementation hardcoded them to 1 for
+  // every performance-family packet; confirmed on real hardware that this
+  // caused a plain response-rate change to also trigger the Windows-key-lock
+  // side effect.
+  report[8] = 1 // fnSwitch — confirmed inert as an experiment variable, standardized at 1
   report[9] = sleepTime
   report[11] = responseLevel
-  report[17] = 0xaa
-  report[18] = 0x55
-  applyChecksum(report, 31)
-  return report
-}
-
-export interface GameModeOptions extends KeyResponseOptions {
-  gameMode: number
-  disableAltTab: number
-  disableAltF4: number
-  disableWin: number
-}
-
-export function gameModeReport(options: GameModeOptions): Uint8Array {
-  const { gameMode, disableAltTab, disableAltF4, disableWin, ...responseOptions } = options
-  const report = keyResponseReport(responseOptions)
-  report[12] = gameMode
+  // No standalone "Game Mode" toggle exists in the vendor software — only the
+  // three independent disable flags below. This byte has no vendor-UI
+  // equivalent; derived as an "any restriction active" aggregate.
+  report[12] = disableWin || disableAltF4 || disableAltTab ? 1 : 0
   report[13] = disableAltTab
   report[14] = disableAltF4
   report[15] = disableWin
+  report[17] = 0xaa
+  report[18] = 0x55
   applyChecksum(report, 31)
   return report
 }

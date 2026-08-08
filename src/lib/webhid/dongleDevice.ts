@@ -1,10 +1,10 @@
-import { applyChecksum, batteryQuery, gameModeReport, keyResponseReport, rgbCommitReport, rgbLEDReport } from '@/lib/protocol'
-import type { ApplyPerformanceOptions, ApplyRgbOptions, AulaDongleDevice, SetGameModeOptions } from '@/lib/device/types'
+import { batteryQuery, keyResponseReport, rgbCommitReport, rgbLEDReport } from '@/lib/protocol'
+import type { ApplyPerformanceOptions, ApplyRgbOptions, AulaDongleDevice } from '@/lib/device/types'
 import { sendOutputReport, waitForInputReport, type HidPort } from './hidPort'
 import { clamp } from './normalize'
 import { delay } from '@/lib/timing'
 
-export type { ApplyPerformanceOptions, ApplyRgbOptions, SetGameModeOptions }
+export type { ApplyPerformanceOptions, ApplyRgbOptions }
 
 const BATTERY_QUERY_LENGTHS = [64, 33, 32]
 const BATTERY_ACK_TIMEOUT_MS = 250
@@ -46,38 +46,12 @@ export class DongleAulaDevice implements AulaDongleDevice {
   async applyPerformance(options: ApplyPerformanceOptions): Promise<void> {
     const report = keyResponseReport({
       responseLevel: clamp(options.level, 1, 5),
-      // fnSwitch=0 was the first experiment (confirmed on hardware to NOT
-      // stop the Windows-key-lock side effect — kept at 0 since it's inert).
-      fnSwitch: 0,
       sleepTime: clamp(options.sleepTime, 0, 3),
+      disableWin: options.disableWin ? 1 : 0,
+      disableAltF4: options.disableAltF4 ? 1 : 0,
+      disableAltTab: options.disableAltTab ? 1 : 0,
     })
-    // Second experiment: bytes 4-7 are hardcoded to 1 in the native driver
-    // for every performance-family packet, enable or disable, with no
-    // documented meaning. Zeroing them here to test whether they're what's
-    // triggering the Windows-key-lock on a plain performance update. The
-    // checksum must be recomputed after mutating them.
-    report[4] = 0
-    report[5] = 0
-    report[6] = 0
-    report[7] = 0
-    applyChecksum(report, 31)
     await sendOutputReport(this.port, report)
-  }
-
-  async setGameMode(options: SetGameModeOptions): Promise<void> {
-    const value = options.enabled ? 1 : 0
-    await sendOutputReport(
-      this.port,
-      gameModeReport({
-        responseLevel: clamp(options.level, 1, 5),
-        fnSwitch: 1,
-        sleepTime: clamp(options.sleepTime, 0, 3),
-        gameMode: value,
-        disableAltTab: value,
-        disableAltF4: value,
-        disableWin: value,
-      }),
-    )
   }
 
   async queryBattery(): Promise<number | null> {

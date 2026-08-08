@@ -11,28 +11,21 @@ export function PerformanceTab() {
   const { dongleDevice } = useConnection()
   const [level, setLevel] = usePersistedState('aula.performance.level', 3)
   const [sleepTime, setSleepTime] = usePersistedState('aula.performance.sleepTime', 1)
-  const [gameMode, setGameMode] = usePersistedState('aula.performance.gameMode', false)
+  const [disableWin, setDisableWin] = usePersistedState('aula.performance.disableWin', false)
+  const [disableAltF4, setDisableAltF4] = usePersistedState('aula.performance.disableAltF4', false)
+  const [disableAltTab, setDisableAltTab] = usePersistedState('aula.performance.disableAltTab', false)
   const [busy, setBusy] = useState(false)
 
-  const applyPerformance = async (nextLevel: number, nextSleep: number) => {
+  const applyPerformance = async (
+    overrides: Partial<{ level: number; sleepTime: number; disableWin: boolean; disableAltF4: boolean; disableAltTab: boolean }> = {},
+  ) => {
     if (!dongleDevice) return
+    const next = { level, sleepTime, disableWin, disableAltF4, disableAltTab, ...overrides }
     setBusy(true)
     try {
-      await dongleDevice.applyPerformance({ level: nextLevel, sleepTime: nextSleep })
+      await dongleDevice.applyPerformance(next)
     } catch (error) {
       toast.error('Could not apply performance settings', { description: error instanceof Error ? error.message : undefined })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const applyGameMode = async (enabled: boolean) => {
-    if (!dongleDevice) return
-    setBusy(true)
-    try {
-      await dongleDevice.setGameMode({ enabled, level, sleepTime })
-    } catch (error) {
-      toast.error('Could not toggle Game Mode', { description: error instanceof Error ? error.message : undefined })
     } finally {
       setBusy(false)
     }
@@ -49,7 +42,7 @@ export function PerformanceTab() {
               type="button"
               onClick={() => {
                 setLevel(option.id)
-                void applyPerformance(option.id, sleepTime)
+                void applyPerformance({ level: option.id })
               }}
               className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors ${
                 level === option.id
@@ -75,7 +68,7 @@ export function PerformanceTab() {
               type="button"
               onClick={() => {
                 setSleepTime(option.id)
-                void applyPerformance(level, option.id)
+                void applyPerformance({ sleepTime: option.id })
               }}
               className={`rounded-md border px-3 py-1.5 text-xs ${
                 sleepTime === option.id
@@ -91,21 +84,50 @@ export function PerformanceTab() {
 
       <Separator />
 
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <Label htmlFor="game-mode" className="text-sm">
-            Game Mode
+      <div className="space-y-3">
+        <Label className="font-mono text-xs text-muted-foreground uppercase">Restrictions</Label>
+
+        <div className="flex items-center justify-between gap-4">
+          <Label htmlFor="disable-win" className="text-sm">
+            Disable Windows Key
           </Label>
-          <p className="text-xs text-muted-foreground">Disables Alt+Tab, Alt+F4, and the Windows key.</p>
+          <Switch
+            id="disable-win"
+            checked={disableWin}
+            onCheckedChange={(checked) => {
+              setDisableWin(checked)
+              void applyPerformance({ disableWin: checked })
+            }}
+          />
         </div>
-        <Switch
-          id="game-mode"
-          checked={gameMode}
-          onCheckedChange={(checked) => {
-            setGameMode(checked)
-            void applyGameMode(checked)
-          }}
-        />
+
+        <div className="flex items-center justify-between gap-4">
+          <Label htmlFor="disable-alt-f4" className="text-sm">
+            Disable ALT+F4
+          </Label>
+          <Switch
+            id="disable-alt-f4"
+            checked={disableAltF4}
+            onCheckedChange={(checked) => {
+              setDisableAltF4(checked)
+              void applyPerformance({ disableAltF4: checked })
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <Label htmlFor="disable-alt-tab" className="text-sm">
+            Disable ALT+Tab
+          </Label>
+          <Switch
+            id="disable-alt-tab"
+            checked={disableAltTab}
+            onCheckedChange={(checked) => {
+              setDisableAltTab(checked)
+              void applyPerformance({ disableAltTab: checked })
+            }}
+          />
+        </div>
       </div>
 
       {busy && <p className="font-mono text-[0.7rem] text-muted-foreground">applying…</p>}

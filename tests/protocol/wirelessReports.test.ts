@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   batteryQuery,
-  gameModeReport,
   keyResponseReport,
   rgbCommitReport,
   rgbLEDReport,
@@ -63,44 +62,53 @@ describe('rgbLEDReport', () => {
 })
 
 describe('keyResponseReport', () => {
-  it('encodes response level, fn switch, sleep time, and footer', () => {
-    const result = keyResponseReport({ responseLevel: 4, fnSwitch: 1, sleepTime: 2 })
+  it('encodes response level, sleep time, fn switch, and footer, with bytes 4-7 always zero', () => {
+    // Bytes 4-7 were hardcoded to 1 in the original reference implementation for
+    // every performance-family packet. Confirmed on real hardware that leaving
+    // them at 1 causes a plain response-rate change to also trigger the
+    // Windows-key-lock side effect — they must stay zero.
+    const result = keyResponseReport({
+      responseLevel: 4,
+      sleepTime: 2,
+      disableWin: 0,
+      disableAltF4: 0,
+      disableAltTab: 0,
+    })
 
     expect(result).toHaveLength(32)
     expect(result[0]).toBe(0x07)
     expect(result[1]).toBe(0x10)
-    expect(result[4]).toBe(1)
-    expect(result[5]).toBe(1)
-    expect(result[6]).toBe(1)
-    expect(result[7]).toBe(1)
-    expect(result[8]).toBe(1) // fnSwitch
+    expect([...result.slice(4, 8)]).toEqual([0, 0, 0, 0])
+    expect(result[8]).toBe(1) // fnSwitch, standardized at 1
     expect(result[9]).toBe(2) // sleepTime
     expect(result[11]).toBe(4) // responseLevel
+    expect(result[12]).toBe(0) // gameMode aggregate: no disable flags set
+    expect(result[13]).toBe(0) // disableAltTab
+    expect(result[14]).toBe(0) // disableAltF4
+    expect(result[15]).toBe(0) // disableWin
     expect(result[17]).toBe(0xaa)
     expect(result[18]).toBe(0x55)
-    expect(result[31]).toBe(33) // checksum
+    expect(result[31]).toBe(29) // checksum
   })
-})
 
-describe('gameModeReport', () => {
-  it('extends a key response report with game mode toggles', () => {
-    const result = gameModeReport({
+  it('sets the gameMode byte as an aggregate whenever any disable flag is on', () => {
+    // The vendor software has no standalone "Game Mode" toggle — only three
+    // independent checkboxes (Disable Windows Key / ALT+F4 / ALT+Tab). Byte 12
+    // has no vendor-UI equivalent, so it's derived here as "any restriction
+    // active" rather than exposed as its own control.
+    const result = keyResponseReport({
       responseLevel: 4,
-      fnSwitch: 1,
       sleepTime: 2,
-      gameMode: 1,
-      disableAltTab: 1,
-      disableAltF4: 0,
       disableWin: 1,
+      disableAltF4: 0,
+      disableAltTab: 1,
     })
 
-    expect(result).toHaveLength(32)
-    expect(result[11]).toBe(4) // responseLevel carried over
-    expect(result[12]).toBe(1) // gameMode
+    expect(result[12]).toBe(1) // gameMode aggregate
     expect(result[13]).toBe(1) // disableAltTab
     expect(result[14]).toBe(0) // disableAltF4
     expect(result[15]).toBe(1) // disableWin
-    expect(result[31]).toBe(36) // checksum
+    expect(result[31]).toBe(32) // checksum
   })
 })
 

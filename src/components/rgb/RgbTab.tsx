@@ -11,6 +11,9 @@ import { usePersistedState } from '@/hooks/usePersistedState'
 
 const DEFAULT_COLOR = '#e0a458'
 
+// Matches the vendor software's preset swatch row.
+const PRESET_COLORS = ['#ff0000', '#ff8000', '#ffff00', '#00ff00', '#0000ff', '#00ffff', '#ff00ff', '#ffffff']
+
 export function RgbTab() {
   const { dongleDevice, setLiveAccent } = useConnection()
   const [mode, setMode] = usePersistedState('aula.rgb.mode', 1)
@@ -42,6 +45,16 @@ export function RgbTab() {
       setApplying(false)
     }
   }
+
+  // There's no device command to read RGB settings back, so on load this only
+  // has last-picked localStorage state. Push it into the shared live-accent
+  // CSS var once on mount so the UI reflects it immediately instead of
+  // showing DEFAULT_COLOR until the user next touches the color picker.
+  useEffect(() => {
+    if (mode !== 0) setLiveAccent(color)
+    // Intentionally mount-only: this seeds the accent from persisted state
+    // once, not on every color/mode change (apply() already handles that).
+  }, [])
 
   // <input type="color">'s native "change" event fires reliably once the
   // picker is confirmed/closed. React's onChange normalizes to the native
@@ -103,6 +116,24 @@ export function RgbTab() {
           />
           <span className="font-mono text-xs text-muted-foreground uppercase">{color}</span>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {PRESET_COLORS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            aria-label={`Set color to ${preset}`}
+            onClick={() => {
+              setColor(preset)
+              void apply({ color: preset })
+            }}
+            className={`size-6 rounded border transition-transform hover:scale-110 ${
+              color.toLowerCase() === preset ? 'border-live ring-1 ring-live' : 'border-border'
+            }`}
+            style={{ backgroundColor: preset }}
+          />
+        ))}
       </div>
 
       <div className="flex items-center justify-between gap-4">

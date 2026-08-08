@@ -1,6 +1,6 @@
 # Aula F75 Max Web
 
-A browser-based configurator for the EpoMaker x Aula F75 Max keyboard — RGB lighting, performance settings, Game Mode, display image/GIF upload, clock sync, and factory reset, all from a web page. No install, no backend: it talks to the keyboard directly over USB using [WebHID](https://developer.mozilla.org/en-US/docs/Web/API/WebHID_API).
+A browser-based configurator for the EpoMaker x Aula F75 Max keyboard — RGB lighting, performance settings, key restrictions (disable Windows key / Alt+F4 / Alt+Tab), display image/GIF upload, clock sync, and factory reset, all from a web page. No install, no backend: it talks to the keyboard directly over USB using [WebHID](https://developer.mozilla.org/en-US/docs/Web/API/WebHID_API).
 
 Ported from the native [Aula F75 Max Driver](https://github.com/VitalyArt/Aula-F75-Max-Driver) project (macOS/Linux/Android).
 

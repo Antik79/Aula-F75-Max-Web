@@ -19,22 +19,18 @@ describe('MockDongleDevice.applyRGB', () => {
 })
 
 describe('MockDongleDevice.applyPerformance', () => {
-  it('records the applied performance state', async () => {
+  it('records the applied performance state, including the disable flags', async () => {
     const device = new MockDongleDevice()
 
-    await device.applyPerformance({ level: 5, sleepTime: 2 })
+    await device.applyPerformance({ level: 5, sleepTime: 2, disableWin: true, disableAltF4: false, disableAltTab: true })
 
-    expect(device.getState().performance).toEqual({ level: 5, sleepTime: 2 })
-  })
-})
-
-describe('MockDongleDevice.setGameMode', () => {
-  it('records the game mode state', async () => {
-    const device = new MockDongleDevice()
-
-    await device.setGameMode({ enabled: true, level: 3, sleepTime: 1 })
-
-    expect(device.getState().gameMode).toEqual({ enabled: true, level: 3, sleepTime: 1 })
+    expect(device.getState().performance).toEqual({
+      level: 5,
+      sleepTime: 2,
+      disableWin: true,
+      disableAltF4: false,
+      disableAltTab: true,
+    })
   })
 })
 

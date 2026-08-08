@@ -28,56 +28,36 @@ describe('DongleAulaDevice.applyRGB', () => {
 })
 
 describe('DongleAulaDevice.applyPerformance', () => {
-  it('sends a clamped key response report', async () => {
+  it('sends a clamped key response report carrying the current disable-flag state', async () => {
     const port = new FakeHidPort()
     const device = new DongleAulaDevice(port)
 
-    await device.applyPerformance({ level: 0, sleepTime: 9 }) // both out of range
+    await device.applyPerformance({
+      level: 0, // out of range
+      sleepTime: 9, // out of range
+      disableWin: true,
+      disableAltF4: false,
+      disableAltTab: true,
+    })
 
     expect(port.sentReports).toHaveLength(1)
-    expect(port.sentReports[0].data[0]).toBe(0x07)
-    expect(port.sentReports[0].data[11]).toBe(1) // responseLevel clamped to min 1
-    expect(port.sentReports[0].data[9]).toBe(3) // sleepTime clamped to max 3
-    // fnSwitch=1 on a plain performance update is suspected of triggering
-    // Game Mode-like behavior on the device (confirmed on real hardware:
-    // response-rate changes alone light up the Windows-key-block LED).
-    // Sending 0 here is the experiment to confirm/rule that out.
-    expect(port.sentReports[0].data[8]).toBe(0)
+    const bytes = port.sentReports[0].data
+    expect(bytes[0]).toBe(0x07)
+    expect(bytes[11]).toBe(1) // responseLevel clamped to min 1
+    expect(bytes[9]).toBe(3) // sleepTime clamped to max 3
+    expect(bytes[13]).toBe(1) // disableAltTab
+    expect(bytes[14]).toBe(0) // disableAltF4
+    expect(bytes[15]).toBe(1) // disableWin
   })
 
-  it('zeroes bytes 4-7 as a second experiment, with a correctly recomputed checksum', async () => {
-    // fnSwitch=0 alone didn't stop the Windows-key-lock side effect on real
-    // hardware. Bytes 4-7 are the only other flag-shaped bytes hardcoded to
-    // 1 in every performance-family packet, enable or disable — testing
-    // whether zeroing them does. The checksum MUST be recomputed after
-    // changing them or the device would likely reject the whole packet.
+  it('zeroes bytes 4-7 on every performance update, confirmed on real hardware to stop response-rate changes from triggering the Windows-key lock', async () => {
     const port = new FakeHidPort()
     const device = new DongleAulaDevice(port)
 
-    await device.applyPerformance({ level: 1, sleepTime: 3 })
+    await device.applyPerformance({ level: 1, sleepTime: 3, disableWin: false, disableAltF4: false, disableAltTab: false })
 
     const bytes = port.sentReports[0].data
     expect([...bytes.slice(4, 8)]).toEqual([0, 0, 0, 0])
-    // Sum of all other non-zero bytes: opcode(7) + subcommand(0x10=16) +
-    // sleepTime(3) + responseLevel(1) + footer(0xaa=170, 0x55=85) = 282,
-    // mod 256 = 26.
-    expect(bytes[31]).toBe(26)
-  })
-})
-
-describe('DongleAulaDevice.setGameMode', () => {
-  it('sends a game mode report with all toggles matching the enabled flag', async () => {
-    const port = new FakeHidPort()
-    const device = new DongleAulaDevice(port)
-
-    await device.setGameMode({ enabled: true, level: 3, sleepTime: 1 })
-
-    expect(port.sentReports).toHaveLength(1)
-    const bytes = port.sentReports[0].data
-    expect(bytes[12]).toBe(1) // gameMode
-    expect(bytes[13]).toBe(1) // disableAltTab
-    expect(bytes[14]).toBe(1) // disableAltF4
-    expect(bytes[15]).toBe(1) // disableWin
   })
 })
 

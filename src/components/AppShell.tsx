@@ -75,7 +75,7 @@ export function AppShell() {
           {/*
             forceMount keeps every tab's component mounted once shown, instead of
             Radix's default of unmounting inactive tabs — which was resetting each
-            tab's local state (RGB picks, Game Mode) back to defaults on every
+            tab's local state (RGB picks, key restrictions) back to defaults on every
             switch, without actually telling the keyboard anything changed.
           */}
           <TabsContent value="rgb" forceMount className="pt-6 data-[state=inactive]:hidden">
@@ -85,7 +85,7 @@ export function AppShell() {
             {dongleReady ? (
               <PerformanceTab />
             ) : (
-              <Placeholder message="Connect the 2.4G receiver to change response rate, sleep timeout, and Game Mode." />
+              <Placeholder message="Connect the 2.4G receiver to change response rate, sleep timeout, and key restrictions." />
             )}
           </TabsContent>
           <TabsContent value="display" forceMount className="pt-6 data-[state=inactive]:hidden">
