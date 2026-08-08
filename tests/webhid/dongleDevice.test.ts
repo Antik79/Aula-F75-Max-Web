@@ -50,7 +50,7 @@ describe('DongleAulaDevice.applyPerformance', () => {
     expect(bytes[15]).toBe(1) // disableWin
   })
 
-  it('zeroes bytes 4-7 on every performance update, confirmed on real hardware to stop response-rate changes from triggering the Windows-key lock', async () => {
+  it('zeroes bytes 4-7 when no restriction is requested, so a plain response-rate change never triggers the Windows-key lock', async () => {
     const port = new FakeHidPort()
     const device = new DongleAulaDevice(port)
 
@@ -58,6 +58,16 @@ describe('DongleAulaDevice.applyPerformance', () => {
 
     const bytes = port.sentReports[0].data
     expect([...bytes.slice(4, 8)]).toEqual([0, 0, 0, 0])
+  })
+
+  it('sets bytes 4-7 when any restriction is requested — this is the actual lock mechanism, not bytes 12-15', async () => {
+    const port = new FakeHidPort()
+    const device = new DongleAulaDevice(port)
+
+    await device.applyPerformance({ level: 1, sleepTime: 3, disableWin: true, disableAltF4: false, disableAltTab: false })
+
+    const bytes = port.sentReports[0].data
+    expect([...bytes.slice(4, 8)]).toEqual([1, 1, 1, 1])
   })
 })
 

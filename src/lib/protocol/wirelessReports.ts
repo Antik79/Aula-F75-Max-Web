@@ -53,17 +53,24 @@ export function keyResponseReport(options: KeyResponseOptions): Uint8Array {
   report[1] = 0x10
   report[2] = 0x00
   report[3] = 0x00
-  // Bytes 4-7 stay zero. The reference implementation hardcoded them to 1 for
-  // every performance-family packet; confirmed on real hardware that this
-  // caused a plain response-rate change to also trigger the Windows-key-lock
-  // side effect.
+  // Bytes 4-7 are the actual restriction lock mechanism — confirmed on real
+  // hardware: hardcoding them to 1 unconditionally (the original reference
+  // behavior) engaged the lock regardless of bytes 12-15, which is why
+  // disabling never reliably cleared it and why a plain response-rate update
+  // alone spuriously triggered it. They mirror the same "any restriction
+  // active" aggregate as byte 12, present only when actually requested.
+  const restrictionActive = disableWin || disableAltF4 || disableAltTab ? 1 : 0
+  report[4] = restrictionActive
+  report[5] = restrictionActive
+  report[6] = restrictionActive
+  report[7] = restrictionActive
   report[8] = 1 // fnSwitch — confirmed inert as an experiment variable, standardized at 1
   report[9] = sleepTime
   report[11] = responseLevel
   // No standalone "Game Mode" toggle exists in the vendor software — only the
   // three independent disable flags below. This byte has no vendor-UI
-  // equivalent; derived as an "any restriction active" aggregate.
-  report[12] = disableWin || disableAltF4 || disableAltTab ? 1 : 0
+  // equivalent; derived as the same aggregate as bytes 4-7.
+  report[12] = restrictionActive
   report[13] = disableAltTab
   report[14] = disableAltF4
   report[15] = disableWin

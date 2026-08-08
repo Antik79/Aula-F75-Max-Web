@@ -128,8 +128,8 @@ export function RgbTab() {
               setColor(preset)
               void apply({ color: preset })
             }}
-            className={`size-6 rounded border transition-transform hover:scale-110 ${
-              color.toLowerCase() === preset ? 'border-live ring-1 ring-live' : 'border-border'
+            className={`size-6 rounded border-2 transition-transform hover:scale-110 ${
+              color.toLowerCase() === preset ? 'border-live' : 'border-border'
             }`}
             style={{ backgroundColor: preset }}
           />

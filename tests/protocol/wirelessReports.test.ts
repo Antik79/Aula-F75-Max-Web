@@ -62,11 +62,7 @@ describe('rgbLEDReport', () => {
 })
 
 describe('keyResponseReport', () => {
-  it('encodes response level, sleep time, fn switch, and footer, with bytes 4-7 always zero', () => {
-    // Bytes 4-7 were hardcoded to 1 in the original reference implementation for
-    // every performance-family packet. Confirmed on real hardware that leaving
-    // them at 1 causes a plain response-rate change to also trigger the
-    // Windows-key-lock side effect — they must stay zero.
+  it('encodes response level, sleep time, fn switch, and footer, with bytes 4-7 and 12 zero when no restriction is active', () => {
     const result = keyResponseReport({
       responseLevel: 4,
       sleepTime: 2,
@@ -82,7 +78,7 @@ describe('keyResponseReport', () => {
     expect(result[8]).toBe(1) // fnSwitch, standardized at 1
     expect(result[9]).toBe(2) // sleepTime
     expect(result[11]).toBe(4) // responseLevel
-    expect(result[12]).toBe(0) // gameMode aggregate: no disable flags set
+    expect(result[12]).toBe(0) // aggregate: no disable flags set
     expect(result[13]).toBe(0) // disableAltTab
     expect(result[14]).toBe(0) // disableAltF4
     expect(result[15]).toBe(0) // disableWin
@@ -91,11 +87,16 @@ describe('keyResponseReport', () => {
     expect(result[31]).toBe(29) // checksum
   })
 
-  it('sets the gameMode byte as an aggregate whenever any disable flag is on', () => {
-    // The vendor software has no standalone "Game Mode" toggle — only three
-    // independent checkboxes (Disable Windows Key / ALT+F4 / ALT+Tab). Byte 12
-    // has no vendor-UI equivalent, so it's derived here as "any restriction
-    // active" rather than exposed as its own control.
+  it('sets bytes 4-7 and byte 12 to 1 whenever any disable flag is on', () => {
+    // Bytes 4-7 turned out to be the actual lock mechanism, not bytes 12-15.
+    // The original reference implementation hardcoded bytes 4-7 to 1 for
+    // every performance-family packet: that's why enabling a restriction
+    // worked but disabling it never reliably cleared the lock (bytes 4-7
+    // stayed 1 regardless of the 12-15 flags), and why a plain response-rate
+    // change alone spuriously triggered the lock too (same reason). Bytes
+    // 12-15 appear to have no vendor-UI equivalent and may be decorative;
+    // bytes 4-7 now track the same "any restriction active" aggregate as
+    // byte 12, present only when a restriction is actually requested.
     const result = keyResponseReport({
       responseLevel: 4,
       sleepTime: 2,
@@ -104,11 +105,12 @@ describe('keyResponseReport', () => {
       disableAltTab: 1,
     })
 
-    expect(result[12]).toBe(1) // gameMode aggregate
+    expect([...result.slice(4, 8)]).toEqual([1, 1, 1, 1])
+    expect(result[12]).toBe(1) // aggregate
     expect(result[13]).toBe(1) // disableAltTab
     expect(result[14]).toBe(0) // disableAltF4
     expect(result[15]).toBe(1) // disableWin
-    expect(result[31]).toBe(32) // checksum
+    expect(result[31]).toBe(36) // checksum
   })
 })
 
