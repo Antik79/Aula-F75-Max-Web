@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { commandExchange, isReadyReply, sendFeatureReport, sendOutputReport, waitForInputReport } from '@/lib/webhid/hidPort'
 import { FakeHidPort } from './fakeHidPort'
+import { clearActivity, getActivityEntries } from '@/lib/activity/log'
 
 describe('commandExchange', () => {
   beforeEach(() => {
@@ -86,6 +87,55 @@ describe('commandExchange', () => {
     await assertion
 
     expect(port.sendFeatureReport).toHaveBeenCalledTimes(6)
+  })
+})
+
+describe('commandExchange activity logging', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    clearActivity()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const run = async (port: FakeHidPort, packet: Uint8Array) => {
+    const exchange = commandExchange(port, packet).catch(() => undefined)
+    await vi.runAllTimersAsync()
+    await exchange
+  }
+  const messages = () => getActivityEntries().map((e) => `${e.level} ${e.message}`)
+
+  it('records which reply offset carried the ready flag, once', async () => {
+    const port = new FakeHidPort()
+    const packet = new Uint8Array([0x04, 0x18])
+    const bytes = new Uint8Array(65)
+    bytes.set([0x04, 0x18, 0x00, 0x01], 1)
+    port.featureReportResponse = new DataView(bytes.buffer)
+
+    await run(port, packet)
+    await run(port, packet)
+
+    expect(messages()).toEqual(['info Ready flag seen at reply offset 1 (leading report-ID byte, 65-byte reply)'])
+  })
+
+  it('notes a command packet that never got the ready flag, but not data packets or reboot', async () => {
+    const port = new FakeHidPort()
+    await run(port, new Uint8Array([0x04, 0x02]))
+    await run(port, new Uint8Array([0x04, 0xf0]))
+    await run(port, new Uint8Array([0x00, 0x01]))
+    expect(messages()).toEqual(['info Command 04 02: no ready flag after 6 polls, continuing'])
+  })
+
+  it('logs each retry as a warning and the final failure as an error', async () => {
+    const port = new FakeHidPort()
+    port.sendFeatureReport.mockRejectedValue(new Error('device gone'))
+    await run(port, new Uint8Array([0x04, 0x18]))
+    const log = messages()
+    expect(log).toHaveLength(6)
+    expect(log[0]).toBe('warn Command 04 18 failed (attempt 1/6, retrying): device gone')
+    expect(log[5]).toBe('error Command 04 18 failed (attempt 6/6, giving up): device gone')
   })
 })
 

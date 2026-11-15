@@ -3,6 +3,7 @@ import type { ApplyPerformanceOptions, ApplyRgbOptions, AulaDongleDevice } from 
 import { sendOutputReport, waitForInputReport, type HidPort } from './hidPort'
 import { clamp } from './normalize'
 import { delay } from '@/lib/timing'
+import { logActivity, logActivityOnce } from '@/lib/activity/log'
 
 export type { ApplyPerformanceOptions, ApplyRgbOptions }
 
@@ -60,9 +61,18 @@ export class DongleAulaDevice implements AulaDongleDevice {
         await sendOutputReport(this.port, batteryQuery({ includeReportID, length }))
         const ack = await waitForInputReport(this.port, BATTERY_ACK_TIMEOUT_MS)
         const percent = ack ? parseBatteryPercent(ack) : null
-        if (percent !== null) return percent
+        if (percent !== null) {
+          logActivityOnce(
+            `battery-format-${length}-${includeReportID}`,
+            'dongle',
+            'info',
+            `Battery reply received for a ${length}-byte query ${includeReportID ? 'with' : 'without'} report ID`,
+          )
+          return percent
+        }
       }
     }
+    logActivity('dongle', 'warn', 'Battery query: no valid reply in any of the known formats')
     return null
   }
 }

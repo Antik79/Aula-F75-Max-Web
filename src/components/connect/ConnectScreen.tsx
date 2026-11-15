@@ -5,6 +5,7 @@ import type { ConnectionError, DeviceStatus } from '@/state/connectionContext'
 import { LINUX_UDEV_RULE } from '@/lib/webhid/errors'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { KeyboardGuide } from '@/components/guide/KeyboardGuide'
+import { ActivityLogButton } from '@/components/activity/ActivityLog'
 
 function StatusDot({ status }: { status: DeviceStatus }) {
   const color =
@@ -149,6 +150,7 @@ export function ConnectScreen() {
               <KeyboardGuide />
             </DialogContent>
           </Dialog>
+          <ActivityLogButton className="text-sm" />
           <button
             type="button"
             onClick={startDemoMode}

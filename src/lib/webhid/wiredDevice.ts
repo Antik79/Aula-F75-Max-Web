@@ -2,6 +2,7 @@ import { AulaConstants, packet, timePayload } from '@/lib/protocol'
 import type { AulaWiredDevice, DisplayUploadProgress } from '@/lib/device/types'
 import { commandExchange, sendFeatureReport, sendOutputReport, waitForInputReport, type HidPort } from './hidPort'
 import { delay } from '@/lib/timing'
+import { logActivity } from '@/lib/activity/log'
 
 export type { DisplayUploadProgress }
 
@@ -55,14 +56,20 @@ export class WiredAulaDevice implements AulaWiredDevice {
     metadata[8] = chunkCount & 0xff
     metadata[9] = (chunkCount >> 8) & 0xff
     await commandExchange(this.commandPort, metadata)
-    await waitForInputReport(this.rawPort, RAW_ACK_TIMEOUT_METADATA_MS)
+    if (!(await waitForInputReport(this.rawPort, RAW_ACK_TIMEOUT_METADATA_MS))) {
+      logActivity('wired', 'info', `Display metadata: no ack within ${RAW_ACK_TIMEOUT_METADATA_MS} ms, continuing`)
+    }
 
+    let missedAcks = 0
     for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
       const offset = chunkIndex * AulaConstants.chunkLength
       const chunk = stream.subarray(offset, offset + AulaConstants.chunkLength)
       await sendOutputReport(this.rawPort, chunk)
-      await waitForInputReport(this.rawPort, RAW_ACK_TIMEOUT_CHUNK_MS)
+      if (!(await waitForInputReport(this.rawPort, RAW_ACK_TIMEOUT_CHUNK_MS))) missedAcks++
       onProgress({ sentChunks: chunkIndex + 1, totalChunks: chunkCount })
+    }
+    if (missedAcks > 0) {
+      logActivity('wired', 'warn', `${missedAcks}/${chunkCount} display chunks got no ack within ${RAW_ACK_TIMEOUT_CHUNK_MS} ms`)
     }
 
     await commandExchange(this.commandPort, packet(0x04, 0x02))

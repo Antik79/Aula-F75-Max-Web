@@ -1,4 +1,5 @@
 import { delay } from '@/lib/timing'
+import { errorMessage, hexHeader, logActivity, logActivityOnce } from '@/lib/activity/log'
 
 export interface HidInputReportEvent {
   data: DataView
@@ -57,10 +58,23 @@ export async function commandExchange(
   options: CommandExchangeOptions = {},
 ): Promise<DataView> {
   const { attempts, retryDelayMs } = { ...COMMAND_EXCHANGE_DEFAULTS, ...options }
-  return withRetry(attempts, retryDelayMs, async () => {
-    await port.sendFeatureReport(0, packet)
-    return waitForReady(port, packet, options)
-  })
+  return withRetry(
+    attempts,
+    retryDelayMs,
+    async () => {
+      await port.sendFeatureReport(0, packet)
+      return waitForReady(port, packet, options)
+    },
+    (attempt, error) => logRetry(`Command ${hexHeader(packet)}`, attempt, attempts, error),
+  )
+}
+
+/** Command packets start 0x04; 0x04 0xf0 reboots the keyboard and isn't expected to ack. */
+const expectsReadyFlag = (packet: Uint8Array) => packet[0] === 0x04 && packet[1] !== 0xf0
+
+function logRetry(what: string, attempt: number, attempts: number, error: unknown) {
+  const outcome = attempt < attempts ? 'retrying' : 'giving up'
+  logActivity('wired', attempt < attempts ? 'warn' : 'error', `${what} failed (attempt ${attempt}/${attempts}, ${outcome}): ${errorMessage(error)}`)
 }
 
 async function waitForReady(port: HidPort, packet: Uint8Array, options: CommandExchangeOptions): Promise<DataView> {
@@ -69,7 +83,20 @@ async function waitForReady(port: HidPort, packet: Uint8Array, options: CommandE
   for (let poll = 0; poll < maxPolls; poll++) {
     await delay(pollIntervalMs)
     reply = await port.receiveFeatureReport(0)
-    if (isReadyReply(reply, packet)) return reply
+    const offset = readyReplyOffset(reply, packet)
+    if (offset !== null) {
+      // Settles which reply layout this browser/OS returns (see readyReplyOffset).
+      logActivityOnce(
+        `ready-offset-${offset}`,
+        'wired',
+        'info',
+        `Ready flag seen at reply offset ${offset} (${offset === 0 ? 'no' : 'leading'} report-ID byte, ${reply.byteLength}-byte reply)`,
+      )
+      return reply
+    }
+  }
+  if (expectsReadyFlag(packet)) {
+    logActivity('wired', 'info', `Command ${hexHeader(packet)}: no ready flag after ${maxPolls} polls, continuing`)
   }
   return reply
 }
@@ -81,21 +108,34 @@ async function waitForReady(port: HidPort, packet: Uint8Array, options: CommandE
  * report ID 0 has varied by platform.
  */
 export function isReadyReply(reply: DataView, packet: Uint8Array): boolean {
+  return readyReplyOffset(reply, packet) !== null
+}
+
+/** Where the ready echo was found: 0, 1 (after a report-ID byte), or null. */
+export function readyReplyOffset(reply: DataView, packet: Uint8Array): 0 | 1 | null {
   const matchesAt = (offset: number) =>
     reply.byteLength > offset + 3 &&
     reply.getUint8(offset) === packet[0] &&
     reply.getUint8(offset + 1) === packet[1] &&
     reply.getUint8(offset + 3) === 0x01
-  return matchesAt(0) || (reply.byteLength > 0 && reply.getUint8(0) === 0 && matchesAt(1))
+  if (matchesAt(0)) return 0
+  if (reply.byteLength > 0 && reply.getUint8(0) === 0 && matchesAt(1)) return 1
+  return null
 }
 
-async function withRetry<T>(attempts: number, retryDelayMs: number, operation: () => Promise<T>): Promise<T> {
+async function withRetry<T>(
+  attempts: number,
+  retryDelayMs: number,
+  operation: () => Promise<T>,
+  onFailure?: (attempt: number, error: unknown) => void,
+): Promise<T> {
   let lastError: unknown
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       return await operation()
     } catch (error) {
       lastError = error
+      onFailure?.(attempt, error)
       if (attempt < attempts) await delay(retryDelayMs)
     }
   }
@@ -112,7 +152,12 @@ export function sendFeatureReport(
   options: Pick<CommandExchangeOptions, 'attempts' | 'retryDelayMs'> = {},
 ): Promise<void> {
   const { attempts, retryDelayMs } = { ...COMMAND_EXCHANGE_DEFAULTS, ...options }
-  return withRetry(attempts, retryDelayMs, () => port.sendFeatureReport(0, bytes))
+  return withRetry(
+    attempts,
+    retryDelayMs,
+    () => port.sendFeatureReport(0, bytes),
+    (attempt, error) => logRetry(`Feature report ${hexHeader(bytes)}`, attempt, attempts, error),
+  )
 }
 
 export function sendOutputReport(port: HidPort, bytes: Uint8Array): Promise<void> {

@@ -15,6 +15,7 @@ If you just want to configure your keyboard, simply head over to https://antik79
 - **Battery** (2.4G receiver) — level indicator with a low-battery notification while the tab is open.
 - **Display** (USB cable) — upload a PNG, JPEG, GIF (animated), BMP, or WebP to the 128×128 screen; sync the keyboard clock; factory reset.
 - **Keyboard guide** — Fn shortcuts for pairing, backlight, media/F-row (Windows and Mac modes), and extra keys. Works without a keyboard connected, from the connect screen or the Guide tab.
+- **Activity log** — what the page sent to the keyboard and how it went (timings, retries, errors). Open it from the sidebar or the connect screen and use **Copy log** to paste it into a bug report.
 
 ## Requirements
 
@@ -52,6 +53,7 @@ No physical keyboard required for UI development — click "Try demo mode" on th
 - `src/lib/webhid/` — `navigator.hid` transport: device selection, the wired keyboard's Feature-report command exchange, the receiver's Output-report + ack pattern, and the chunked display-upload state machine.
 - `src/lib/mock/` — simulated devices satisfying the same interface as `lib/webhid`, powering demo mode.
 - `src/lib/lighting/` — effect renderer, F75 Max keyboard layout, and profile logic behind the RGB preview (ported from the native driver's `LightingEffectRenderer`, `KeyboardLayout`, and `LightingProfileStore`).
+- `src/lib/activity/` — the in-memory activity log and the wrappers that log each device operation.
 - `src/lib/guide/` — the keyboard guide's shortcut catalog (from the native driver's `docs/keyboard-guide/catalog.json`).
 - `src/lib/display/` — image/GIF decoding (Canvas + [gifuct-js](https://github.com/matt-way/gifuct-js)) and RGB565 fit-mode scaling for the 128×128 display.
 - `src/components/`, `src/state/` — the React UI and connection state.
@@ -67,4 +69,4 @@ Pushes to `main` build and publish to GitHub Pages via `.github/workflows/deploy
 - **Profiles live in this browser.** They're stored in localStorage (the keyboard has no profile slots), so they don't sync between browsers or machines, and clearing site data removes them.
 - **The lighting preview is an approximation.** There's no command to read the keyboard's actual animation back.
 - **Keep the tab in front during long wired operations.** Each wired command waits for the keyboard's ready signal; Chrome throttles timers in background tabs, which can make a factory reset take much longer if you switch away.
-- **Nothing leaves your browser.** All communication is direct USB HID between your browser and the keyboard — there's no server component and no telemetry.
+- **Nothing leaves your browser.** All communication is direct USB HID between your browser and the keyboard — there's no server component and no telemetry. The activity log is kept in memory only and is cleared on reload; it leaves the page only if you copy it.

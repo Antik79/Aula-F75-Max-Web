@@ -4,6 +4,8 @@ import { connectDongleDevice, connectWiredDevice, isWebHidSupported } from '@/li
 import { AulaHidError } from '@/lib/webhid/errors'
 import { MockDongleDevice } from '@/lib/mock/mockDongleDevice'
 import { MockWiredDevice } from '@/lib/mock/mockWiredDevice'
+import { errorMessage, logActivity } from '@/lib/activity/log'
+import { withDongleLogging, withWiredLogging } from '@/lib/activity/instrument'
 
 export type DeviceStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
@@ -42,6 +44,13 @@ function describeError(error: unknown): ConnectionError {
   return { message: 'Something went wrong while connecting.', showUdevHint: false }
 }
 
+const hex4 = (n: number) => n.toString(16).padStart(4, '0')
+
+function describeHidDevice(device: HIDDevice): string {
+  const pages = device.collections.map((c) => `0x${hex4(c.usagePage ?? 0)}`).join(', ')
+  return `"${device.productName}" ${hex4(device.vendorId)}:${hex4(device.productId)}, usage pages ${pages || 'none'}`
+}
+
 export function ConnectionProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<'hardware' | 'demo'>('hardware')
   const [wiredStatus, setWiredStatus] = useState<DeviceStatus>('disconnected')
@@ -52,6 +61,16 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   const [dongleDevice, setDongleDevice] = useState<AulaDongleDevice | null>(null)
   const [liveAccent, setLiveAccent] = useState(DEFAULT_ACCENT)
 
+  // Log unplugs. Doesn't change connection state: the next command fails and
+  // reports it, and the user can reconnect from the connect screen.
+  useEffect(() => {
+    if (!isWebHidSupported()) return
+    const onDisconnect = (event: HIDConnectionEvent) =>
+      logActivity('app', 'warn', `Device disconnected: ${describeHidDevice(event.device)}`)
+    navigator.hid.addEventListener('disconnect', onDisconnect)
+    return () => navigator.hid.removeEventListener('disconnect', onDisconnect)
+  }, [])
+
   useEffect(() => {
     document.documentElement.style.setProperty('--live-accent', liveAccent)
   }, [liveAccent])
@@ -59,12 +78,16 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   const connectWired = useCallback(() => {
     setWiredStatus('connecting')
     setWiredError(null)
+    logActivity('wired', 'info', 'Connecting…')
     connectWiredDevice()
       .then((connection) => {
-        setWiredDevice(connection.device)
+        logActivity('wired', 'info', `Connected: command ${describeHidDevice(connection.commandDevice)}`)
+        logActivity('wired', 'info', `Connected: display ${describeHidDevice(connection.rawDevice)}`)
+        setWiredDevice(withWiredLogging(connection.device))
         setWiredStatus('connected')
       })
       .catch((error: unknown) => {
+        logActivity('wired', 'error', `Connect failed: ${errorMessage(error)}`)
         setWiredError(describeError(error))
         setWiredStatus('error')
       })
@@ -73,21 +96,25 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   const connectDongle = useCallback(() => {
     setDongleStatus('connecting')
     setDongleError(null)
+    logActivity('dongle', 'info', 'Connecting…')
     connectDongleDevice()
       .then((connection) => {
-        setDongleDevice(connection.device)
+        logActivity('dongle', 'info', `Connected: ${describeHidDevice(connection.rawDevice)}`)
+        setDongleDevice(withDongleLogging(connection.device))
         setDongleStatus('connected')
       })
       .catch((error: unknown) => {
+        logActivity('dongle', 'error', `Connect failed: ${errorMessage(error)}`)
         setDongleError(describeError(error))
         setDongleStatus('error')
       })
   }, [])
 
   const startDemoMode = useCallback(() => {
+    logActivity('app', 'info', 'Demo mode started (no keyboard involved)')
     setMode('demo')
-    setWiredDevice(new MockWiredDevice())
-    setDongleDevice(new MockDongleDevice())
+    setWiredDevice(withWiredLogging(new MockWiredDevice()))
+    setDongleDevice(withDongleLogging(new MockDongleDevice()))
     setWiredStatus('connected')
     setDongleStatus('connected')
     setWiredError(null)

@@ -6,6 +6,7 @@ import { PerformanceTab } from '@/components/performance/PerformanceTab'
 import { DisplayTab } from '@/components/display/DisplayTab'
 import { AboutPanel } from '@/components/about/AboutPanel'
 import { KeyboardGuide } from '@/components/guide/KeyboardGuide'
+import { ActivityLogButton } from '@/components/activity/ActivityLog'
 import { useConnection, type DeviceStatus } from '@/state/connectionContext'
 
 function RailDot({ status }: { status: DeviceStatus }) {
@@ -54,7 +55,8 @@ export function AppShell() {
 
         <BatteryIndicator />
 
-        <div className="mt-auto">
+        <div className="mt-auto space-y-3">
+          <ActivityLogButton className="font-mono text-xs" />
           <div
             className="h-1.5 w-full rounded-full"
             style={{ backgroundColor: 'var(--live-accent)' }}
