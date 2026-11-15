@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge'
 import { useConnection } from '@/state/connectionContext'
 import type { ConnectionError, DeviceStatus } from '@/state/connectionContext'
 import { LINUX_UDEV_RULE } from '@/lib/webhid/errors'
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { KeyboardGuide } from '@/components/guide/KeyboardGuide'
 
 function StatusDot({ status }: { status: DeviceStatus }) {
   const color =
@@ -131,7 +133,22 @@ export function ConnectScreen() {
           </div>
         </details>
 
-        <div className="mt-5 text-center">
+        <div className="mt-5 flex items-center justify-center gap-6">
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Keyboard guide
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-3xl">
+              <DialogTitle className="font-heading">Keyboard guide</DialogTitle>
+              <DialogDescription className="sr-only">Fn shortcuts and pairing reference</DialogDescription>
+              <KeyboardGuide />
+            </DialogContent>
+          </Dialog>
           <button
             type="button"
             onClick={startDemoMode}

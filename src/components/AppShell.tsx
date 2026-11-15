@@ -5,6 +5,7 @@ import { RgbTab } from '@/components/rgb/RgbTab'
 import { PerformanceTab } from '@/components/performance/PerformanceTab'
 import { DisplayTab } from '@/components/display/DisplayTab'
 import { AboutPanel } from '@/components/about/AboutPanel'
+import { KeyboardGuide } from '@/components/guide/KeyboardGuide'
 import { useConnection, type DeviceStatus } from '@/state/connectionContext'
 
 function RailDot({ status }: { status: DeviceStatus }) {
@@ -69,6 +70,7 @@ export function AppShell() {
             <TabsTrigger value="rgb">RGB</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="display">Display</TabsTrigger>
+            <TabsTrigger value="guide">Guide</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
 
@@ -94,6 +96,9 @@ export function AppShell() {
             ) : (
               <Placeholder message="Connect the wired keyboard to upload display images, sync the clock, or factory reset." />
             )}
+          </TabsContent>
+          <TabsContent value="guide" forceMount className="pt-6 data-[state=inactive]:hidden">
+            <KeyboardGuide />
           </TabsContent>
           <TabsContent value="about" forceMount className="pt-6 data-[state=inactive]:hidden">
             <AboutPanel />
