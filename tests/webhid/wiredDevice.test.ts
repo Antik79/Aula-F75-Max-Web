@@ -5,12 +5,16 @@ import { FakeHidPort } from './fakeHidPort'
 
 describe('WiredAulaDevice.syncTime', () => {
   it('sends begin, prepare, time payload, and commit as feature reports in order', async () => {
+    vi.useFakeTimers()
     const commandPort = new FakeHidPort()
     const rawPort = new FakeHidPort()
     const device = new WiredAulaDevice({ commandPort, rawPort })
     const date = new Date(2024, 2, 15, 9, 5, 3) // Friday
 
-    await device.syncTime(date)
+    const syncPromise = device.syncTime(date)
+    await vi.runAllTimersAsync()
+    await syncPromise
+    vi.useRealTimers()
 
     expect(commandPort.sentFeatureReports).toHaveLength(4)
     expect([...commandPort.sentFeatureReports[0].data.slice(0, 2)]).toEqual([0x04, 0x18])
@@ -87,9 +91,9 @@ describe('WiredAulaDevice.factoryReset', () => {
     expect(footerPacket?.data[14]).toBe(0xaa)
     expect(footerPacket?.data[15]).toBe(0x55)
 
-    // Zero-page writes (23 total across the three zeroed stages) skip the ack read.
-    const rawWrites = commandPort.sendFeatureReport.mock.calls.length - commandPort.receiveFeatureReport.mock.calls.length
-    expect(rawWrites).toBe(23)
+    // 8 + 9 + 9 zero pages across the three zeroed stages.
+    const zeroPages = commandPort.sentFeatureReports.filter((r) => r.data.every((b) => b === 0))
+    expect(zeroPages).toHaveLength(26)
     vi.useRealTimers()
   })
 })
