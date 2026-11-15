@@ -8,6 +8,9 @@ import { useConnection } from '@/state/connectionContext'
 import { DIRECTIONS, RGB_MODES } from '@/lib/device/labels'
 import { hexToDeviceColor } from '@/lib/device/color'
 import { usePersistedState } from '@/hooks/usePersistedState'
+import type { LightingSettings } from '@/lib/lighting/settings'
+import { KeyboardPreview } from './KeyboardPreview'
+import { ProfilesPanel } from './ProfilesPanel'
 
 const DEFAULT_COLOR = '#e0a458'
 
@@ -25,7 +28,19 @@ export function RgbTab() {
   const [applying, setApplying] = useState(false)
   const colorInputRef = useRef<HTMLInputElement>(null)
 
-  const apply = async (overrides: Partial<{ mode: number; color: string; brightness: number; speed: number; direction: number; colorful: boolean }> = {}) => {
+  const current: LightingSettings = { mode, color, brightness, speed, direction, colorful }
+
+  const loadSettings = (next: LightingSettings) => {
+    setMode(next.mode)
+    setColor(next.color)
+    setBrightness(next.brightness)
+    setSpeed(next.speed)
+    setDirection(next.direction)
+    setColorful(next.colorful)
+    void apply(next)
+  }
+
+  const apply = async (overrides: Partial<LightingSettings> = {}) => {
     if (!dongleDevice) return
     const next = { mode, color, brightness, speed, direction, colorful, ...overrides }
     setApplying(true)
@@ -74,140 +89,155 @@ export function RgbTab() {
   const showMovementControls = mode !== 0 && mode !== 1
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-4xl space-y-8">
       <div className="space-y-2">
-        <Label className="font-mono text-xs text-muted-foreground uppercase">Effect</Label>
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-          {RGB_MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => {
-                setMode(m.id)
-                void apply({ mode: m.id })
+        <KeyboardPreview settings={current} />
+        <p className="text-center font-mono text-[0.65rem] text-muted-foreground">
+          approximate preview · the keyboard's own animation may differ
+        </p>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_15rem]">
+        <div className="min-w-0 space-y-6">
+          <div className="space-y-2">
+            <Label className="font-mono text-xs text-muted-foreground uppercase">Effect</Label>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {RGB_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    setMode(m.id)
+                    void apply({ mode: m.id })
+                  }}
+                  className={`rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
+                    mode === m.id
+                      ? 'border-live bg-live/10 text-foreground'
+                      : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {m.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="rgb-color" className="font-mono text-xs text-muted-foreground uppercase">
+              Color
+            </Label>
+            <div className="flex items-center gap-2">
+              <input
+                id="rgb-color"
+                ref={colorInputRef}
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                onBlur={(e) => void apply({ color: e.target.value })}
+                className="size-8 cursor-pointer rounded border border-border bg-transparent"
+              />
+              <span className="font-mono text-xs text-muted-foreground uppercase">{color}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {PRESET_COLORS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                aria-label={`Set color to ${preset}`}
+                onClick={() => {
+                  setColor(preset)
+                  void apply({ color: preset })
+                }}
+                className={`size-6 rounded border-2 transition-transform hover:scale-110 ${
+                  color.toLowerCase() === preset ? 'border-live' : 'border-border'
+                }`}
+                style={{ backgroundColor: preset }}
+              />
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="rgb-colorful" className="text-sm">
+              Colorful (cycle through colors)
+            </Label>
+            <Switch
+              id="rgb-colorful"
+              checked={colorful}
+              onCheckedChange={(checked) => {
+                setColorful(checked)
+                void apply({ colorful: checked })
               }}
-              className={`rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
-                mode === m.id
-                  ? 'border-live bg-live/10 text-foreground'
-                  : 'border-border bg-card text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {m.title}
-            </button>
-          ))}
-        </div>
-      </div>
+            />
+          </div>
 
-      <Separator />
-
-      <div className="flex items-center justify-between gap-4">
-        <Label htmlFor="rgb-color" className="font-mono text-xs text-muted-foreground uppercase">
-          Color
-        </Label>
-        <div className="flex items-center gap-2">
-          <input
-            id="rgb-color"
-            ref={colorInputRef}
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            onBlur={(e) => void apply({ color: e.target.value })}
-            className="size-8 cursor-pointer rounded border border-border bg-transparent"
-          />
-          <span className="font-mono text-xs text-muted-foreground uppercase">{color}</span>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        {PRESET_COLORS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            aria-label={`Set color to ${preset}`}
-            onClick={() => {
-              setColor(preset)
-              void apply({ color: preset })
-            }}
-            className={`size-6 rounded border-2 transition-transform hover:scale-110 ${
-              color.toLowerCase() === preset ? 'border-live' : 'border-border'
-            }`}
-            style={{ backgroundColor: preset }}
-          />
-        ))}
-      </div>
-
-      <div className="flex items-center justify-between gap-4">
-        <Label htmlFor="rgb-colorful" className="text-sm">
-          Colorful (cycle through colors)
-        </Label>
-        <Switch
-          id="rgb-colorful"
-          checked={colorful}
-          onCheckedChange={(checked) => {
-            setColorful(checked)
-            void apply({ colorful: checked })
-          }}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="font-mono text-xs text-muted-foreground uppercase">Brightness</Label>
-          <span className="font-mono text-xs text-muted-foreground">{brightness}/5</span>
-        </div>
-        <Slider
-          min={1}
-          max={5}
-          step={1}
-          value={[brightness]}
-          onValueChange={([v]) => setBrightness(v)}
-          onValueCommit={([v]) => void apply({ brightness: v })}
-        />
-      </div>
-
-      {showMovementControls && (
-        <>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="font-mono text-xs text-muted-foreground uppercase">Speed</Label>
-              <span className="font-mono text-xs text-muted-foreground">{speed}/5</span>
+              <Label className="font-mono text-xs text-muted-foreground uppercase">Brightness</Label>
+              <span className="font-mono text-xs text-muted-foreground">{brightness}/5</span>
             </div>
             <Slider
               min={1}
               max={5}
               step={1}
-              value={[speed]}
-              onValueChange={([v]) => setSpeed(v)}
-              onValueCommit={([v]) => void apply({ speed: v })}
+              value={[brightness]}
+              onValueChange={([v]) => setBrightness(v)}
+              onValueCommit={([v]) => void apply({ brightness: v })}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label className="font-mono text-xs text-muted-foreground uppercase">Direction</Label>
-            <div className="flex gap-1.5">
-              {DIRECTIONS.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => {
-                    setDirection(d.id)
-                    void apply({ direction: d.id })
-                  }}
-                  className={`rounded-md border px-3 py-1 text-xs ${
-                    direction === d.id
-                      ? 'border-live bg-live/10 text-foreground'
-                      : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {d.title}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+          {showMovementControls && (
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="font-mono text-xs text-muted-foreground uppercase">Speed</Label>
+                  <span className="font-mono text-xs text-muted-foreground">{speed}/5</span>
+                </div>
+                <Slider
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={[speed]}
+                  onValueChange={([v]) => setSpeed(v)}
+                  onValueCommit={([v]) => void apply({ speed: v })}
+                />
+              </div>
 
-      {applying && <p className="font-mono text-[0.7rem] text-muted-foreground">applying…</p>}
+              <div className="space-y-2">
+                <Label className="font-mono text-xs text-muted-foreground uppercase">Direction</Label>
+                <div className="flex gap-1.5">
+                  {DIRECTIONS.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => {
+                        setDirection(d.id)
+                        void apply({ direction: d.id })
+                      }}
+                      className={`rounded-md border px-3 py-1 text-xs ${
+                        direction === d.id
+                          ? 'border-live bg-live/10 text-foreground'
+                          : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {d.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {applying && <p className="font-mono text-[0.7rem] text-muted-foreground">applying…</p>}
+        </div>
+
+        <aside>
+          <ProfilesPanel current={current} onLoad={loadSettings} />
+        </aside>
+      </div>
     </div>
   )
 }
